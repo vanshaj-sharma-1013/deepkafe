@@ -1,8 +1,10 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #eef3f9;
+  --foreground: #1b2733;
 }
 
 @theme inline {
@@ -12,15 +14,18 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+.circuit-bg {
+  background-color: var(--background);
+  background-image:
+    radial-gradient(circle at 4px 4px, rgba(59, 110, 165, 0.18) 1.5px, transparent 1.5px),
+    linear-gradient(rgba(59, 110, 165, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(59, 110, 165, 0.08) 1px, transparent 1px);
+  background-size: 64px 64px, 64px 64px, 64px 64px;
+  background-position: 0 0, 0 0, 0 0;
 }

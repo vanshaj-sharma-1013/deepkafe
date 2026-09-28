@@ -1,69 +1,84 @@
-import Image from "next/image";
+import Link from "next/link";
+import { ArrowRight, Layers, ScanSearch, ShieldCheck } from "lucide-react";
+import StatsCards, { DashboardStats } from "@/components/StatsCards";
+
+const mockStats: DashboardStats = {
+  totalTested: 1284,
+  accuracyPercent: 96,
+  realCount: 742,
+  fakeCount: 542,
+};
+
+const features = [
+  {
+    icon: <ScanSearch size={20} />,
+    title: "Multi-Model Chain",
+    description:
+      "Every upload is cross-checked across Groq, Gemini, and OpenRouter models for consensus scoring.",
+  },
+  {
+    icon: <Layers size={20} />,
+    title: "Metadata Forensics",
+    description:
+      "Inspect dimensions, file size, and format alongside compression and pixel-level artifact analysis.",
+  },
+  {
+    icon: <ShieldCheck size={20} />,
+    title: "Confidence Scoring",
+    description:
+      "Get calibrated authenticity confidence with a transparent breakdown of each model's verdict.",
+  },
+];
 
 export default function Home() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+    <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-16">
+      <section className="flex flex-col items-start gap-6 text-left">
+        <span className="rounded-full bg-[#dbe8f5] px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-[#2f5c8a]">
+          Deepfake Detection Testing Module
+        </span>
+        <h1 className="max-w-2xl text-4xl font-bold leading-tight tracking-tight text-[#1b2733] sm:text-5xl">
+          Test, validate, and inspect AI image detection results in one workbench.
+        </h1>
+        <p className="max-w-xl text-lg text-[#3d5670]">
+          Upload images, run them through a chained multi-model detection pipeline, and
+          review confidence scores, model consensus, and metadata — all in a single
+          dashboard built for testing and validation.
+        </p>
+        <Link
+          href="/test"
+          className="inline-flex items-center gap-2 rounded-full bg-[#3b6ea5] px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#2f5c8a]"
+        >
+          Open Testing Workbench
+          <ArrowRight size={16} />
+        </Link>
+      </section>
+
+      <section className="mt-14">
+        <h2 className="mb-4 text-lg font-semibold text-[#1b2733]">
+          Overview
+        </h2>
+        <StatsCards stats={mockStats} />
+      </section>
+
+      <section className="mt-14 grid grid-cols-1 gap-6 sm:grid-cols-3">
+        {features.map((feature) => (
+          <div
+            key={feature.title}
+            className="rounded-2xl border border-[#c9dbee] bg-white p-6 shadow-sm"
           >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+            <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-[#dbe8f5] text-[#3b6ea5]">
+              {feature.icon}
+            </div>
+            <h3 className="font-semibold text-[#1b2733]">
+              {feature.title}
+            </h3>
+            <p className="mt-2 text-sm text-[#3d5670]">
+              {feature.description}
+            </p>
+          </div>
+        ))}
+      </section>
+    </main>
   );
 }
