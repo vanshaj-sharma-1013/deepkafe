@@ -16,6 +16,60 @@ import { cn, formatBytes, formatPercent } from "@/lib/utils";
 
 interface ResultsCardProps {
   result: DetectionResult;
+  previewUrl: string | null;
+}
+
+function RegionsPanel({ result, previewUrl }: ResultsCardProps) {
+  const regions = result.regions ?? [];
+
+  if (!previewUrl) {
+    return (
+      <div className="mt-2 flex h-32 items-center justify-center rounded-md border-2 border-dashed border-[#a9c6e3] bg-[#dbe8f5] text-sm text-[#5c7a9c]">
+        Image preview unavailable.
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-2 rounded-md border border-[#c9dbee] bg-white p-3">
+      <div className="relative mx-auto w-fit">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={previewUrl}
+          alt="Analyzed image with suspected AI regions marked"
+          className="block max-h-96 max-w-full rounded"
+        />
+        {regions.map((region, index) => (
+          <span
+            key={`${region.x}-${region.y}-${index}`}
+            title={region.label}
+            className="absolute h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-red-600 shadow-md ring-2 ring-white"
+            style={{ left: `${region.x * 100}%`, top: `${region.y * 100}%` }}
+          />
+        ))}
+      </div>
+
+      {regions.length > 0 ? (
+        <ul className="mt-3 space-y-1.5 text-sm text-[#3d5670]">
+          {regions.map((region, index) => (
+            <li key={`${region.label}-${index}`} className="flex items-start gap-2">
+              <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-red-600" />
+              {region.label}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="mt-3 text-center text-xs text-[#5c7a9c]">
+          {result.source === "simulated"
+            ? "Region markers need a live AI provider. Add an API key to enable them."
+            : "No suspicious regions reported."}
+        </p>
+      )}
+      <p className="mt-2 text-center text-[11px] text-[#5c7a9c]">
+        Locations are approximate, estimated by the AI models.
+      </p>
+    </div>
+  );
 }
 
 function ModelRow({ model }: { model: DetectionResult["models"][number] }) {
@@ -30,7 +84,7 @@ function ModelRow({ model }: { model: DetectionResult["models"][number] }) {
       <div>
         <p className="font-medium text-[#1b2733]">{model.name}</p>
         <p className="text-xs text-[#5c7a9c]">
-          via {model.provider}
+          via DeepFake
           {model.latencyMs > 0 ? ` · ${model.latencyMs}ms` : ""}
         </p>
         <p className="mt-1 text-sm text-[#3d5670]">{model.notes}</p>
@@ -47,7 +101,7 @@ function ModelRow({ model }: { model: DetectionResult["models"][number] }) {
   );
 }
 
-export default function ResultsCard({ result }: ResultsCardProps) {
+export default function ResultsCard({ result, previewUrl }: ResultsCardProps) {
   const [heatmapOpen, setHeatmapOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const isFake = result.verdict === "fake";
@@ -93,14 +147,10 @@ export default function ResultsCard({ result }: ResultsCardProps) {
         className="mt-5 flex w-full items-center justify-center gap-2 rounded-md bg-[#3b6ea5] px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-[#2f5c8a]"
       >
         <Search size={16} />
-        Tampering Heatmap ]
+        Suspected AI Regions
         {heatmapOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
       </button>
-      {heatmapOpen && (
-        <div className="mt-2 flex h-32 items-center justify-center rounded-md border-2 border-dashed border-[#a9c6e3] bg-[#dbe8f5] text-sm text-[#5c7a9c]">
-          Heatmap visualization requires a live backend connection.
-        </div>
-      )}
+      {heatmapOpen && <RegionsPanel result={result} previewUrl={previewUrl} />}
 
       <button
         onClick={() => setDetailsOpen((v) => !v)}

@@ -1,5 +1,13 @@
 export type AnalysisMode = "quick" | "deep";
 
+export interface SuspectRegion {
+  /** Fraction of image width from the left edge, 0-1. */
+  x: number;
+  /** Fraction of image height from the top edge, 0-1. */
+  y: number;
+  label: string;
+}
+
 export interface ModelInsight {
   name: string;
   provider: string;
@@ -7,6 +15,7 @@ export interface ModelInsight {
   confidence: number;
   notes: string;
   latencyMs: number;
+  regions?: SuspectRegion[];
 }
 
 export interface ImageMetadata {
@@ -30,6 +39,7 @@ export interface DetectionResult {
   processedAt: string;
   totalLatencyMs: number;
   source: ResultSource;
+  regions?: SuspectRegion[];
 }
 
 export interface DetectionError {

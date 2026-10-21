@@ -1,12 +1,41 @@
 import { NextRequest, NextResponse } from "next/server";
-import type { AnalysisMode, DetectionResult, ImageMetadata, ModelInsight } from "@/lib/types";
-import { callGemini, callGroq, callOpenRouter, type ProviderVerdict } from "@/lib/providers";
+import type {
+  AnalysisMode,
+  DetectionResult,
+  ImageMetadata,
+  ModelInsight,
+  SuspectRegion,
+} from "@/lib/types";
+import {
+  callGemini,
+  callGroq,
+  callOpenRouter,
+  locateGemini,
+  locateGroq,
+  locateOpenRouter,
+  type ProviderVerdict,
+} from "@/lib/providers";
 
 export const runtime = "nodejs";
 
 const ALLOWED_TYPES = ["image/png", "image/jpeg", "image/jpg"];
 const MAX_FILE_SIZE = 15 * 1024 * 1024;
 const BACKEND_TIMEOUT_MS = 20_000;
+const REGION_MERGE_DISTANCE = 0.08;
+const MAX_MERGED_REGIONS = 8;
+const MIN_REGIONS = 3;
+
+function mergeRegions(groups: SuspectRegion[][]): SuspectRegion[] {
+  const merged: SuspectRegion[] = [];
+  for (const region of groups.flat()) {
+    const isDuplicate = merged.some(
+      (m) => Math.hypot(m.x - region.x, m.y - region.y) < REGION_MERGE_DISTANCE
+    );
+    if (!isDuplicate) merged.push(region);
+    if (merged.length >= MAX_MERGED_REGIONS) break;
+  }
+  return merged;
+}
 
 interface ProviderDef {
   id: string;
@@ -14,12 +43,18 @@ interface ProviderDef {
   provider: string;
   envKey: string;
   call: (base64: string, mimeType: string, apiKey: string) => Promise<ProviderVerdict>;
+  locate: (
+    base64: string,
+    mimeType: string,
+    apiKey: string,
+    dims?: { width: number; height: number }
+  ) => Promise<SuspectRegion[]>;
 }
 
 const PROVIDER_REGISTRY: ProviderDef[] = [
-  { id: "groq", label: "Vision Consensus", provider: "Groq", envKey: "GROQ_API_KEY", call: callGroq },
-  { id: "gemini", label: "Frequency & Artifact Analysis", provider: "Gemini", envKey: "GEMINI_API_KEY", call: callGemini },
-  { id: "openrouter", label: "GAN Fingerprint Detector", provider: "OpenRouter", envKey: "OPENROUTER_API_KEY", call: callOpenRouter },
+  { id: "DeepFake", label: "Vision Consensus", provider: "Groq", envKey: "GROQ_API_KEY", call: callGroq, locate: locateGroq },
+  { id: "DeepFake", label: "Frequency & Artifact Analysis", provider: "Gemini", envKey: "GEMINI_API_KEY", call: callGemini, locate: locateGemini },
+  { id: "DeepFake", label: "GAN Fingerprint Detector", provider: "OpenRouter", envKey: "OPENROUTER_API_KEY", call: callOpenRouter, locate: locateOpenRouter },
 ];
 
 function seededRandom(seed: number): () => number {
@@ -139,6 +174,7 @@ function buildSimulatedResult(
     processedAt: new Date().toISOString(),
     totalLatencyMs: models.reduce((sum, m) => sum + m.latencyMs, 0),
     source: "simulated",
+    regions: [],
   };
 }
 
@@ -204,6 +240,50 @@ async function runLiveDetection(
     }
   }
 
+  // Ask the models that called the image fake where they see the problems.
+  // Failures here only mean fewer markers; they never affect the verdict.
+  const askedIds = new Set<string>();
+  const tryLocate = async (def: ProviderDef): Promise<SuspectRegion[]> => {
+    askedIds.add(def.envKey);
+    try {
+      return await def.locate(base64, file.type, process.env[def.envKey] as string, dimensions);
+    } catch (err) {
+      console.error(`[detect] provider ${def.id} region lookup failed:`, err);
+      return [];
+    }
+  };
+
+  const regionsByIndex = await Promise.all(
+    settled.map((outcome, index) =>
+      outcome.status === "fulfilled" && outcome.value.verdict === "fake"
+        ? tryLocate(attempted[index])
+        : Promise.resolve<SuspectRegion[]>([])
+    )
+  );
+
+  // When the image is fake but we still have too few markers (a request failed, or a
+  // model returned too little), fall back to the other providers until we have enough.
+  const succeeded = settled.filter(
+    (o): o is PromiseFulfilledResult<ProviderVerdict> => o.status === "fulfilled"
+  );
+  const fakeScore =
+    succeeded.length > 0
+      ? succeeded.reduce((sum, o) => sum + o.value.fakeConfidence, 0) / succeeded.length
+      : 0;
+  let mergedRegions = mergeRegions(regionsByIndex);
+
+  if (fakeScore >= 50) {
+    const fallbacks = [
+      // Providers not asked yet, then the ones that were asked but came back short.
+      ...available.filter((p) => !askedIds.has(p.envKey)),
+      ...available.filter((p) => askedIds.has(p.envKey)),
+    ];
+    for (const def of fallbacks) {
+      if (mergedRegions.length >= MIN_REGIONS) break;
+      mergedRegions = mergeRegions([mergedRegions, await tryLocate(def)]);
+    }
+  }
+
   const models: ModelInsight[] = settled.map((outcome, index) => {
     const def = attempted[index];
     if (outcome.status === "fulfilled") {
@@ -216,6 +296,7 @@ async function runLiveDetection(
         confidence: Number(confidenceInVerdict.toFixed(2)),
         notes: v.notes,
         latencyMs: v.latencyMs,
+        regions: regionsByIndex[index],
       };
     }
     console.error(`[detect] provider ${def.id} failed:`, outcome.reason);
@@ -231,14 +312,8 @@ async function runLiveDetection(
     };
   });
 
-  const succeeded = settled.filter(
-    (o): o is PromiseFulfilledResult<ProviderVerdict> => o.status === "fulfilled"
-  );
-
   if (succeeded.length === 0) return null;
 
-  const fakeScore =
-    succeeded.reduce((sum, o) => sum + o.value.fakeConfidence, 0) / succeeded.length;
   const realScore = 100 - fakeScore;
   const verdict: "fake" | "real" = fakeScore >= 50 ? "fake" : "real";
   const confidence = verdict === "fake" ? fakeScore : realScore;
@@ -262,6 +337,7 @@ async function runLiveDetection(
     processedAt: new Date().toISOString(),
     totalLatencyMs: models.reduce((sum, m) => sum + m.latencyMs, 0),
     source: "live",
+    regions: verdict === "fake" ? mergedRegions : [],
   };
 }
 

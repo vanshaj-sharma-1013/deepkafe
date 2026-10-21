@@ -128,7 +128,7 @@ export default function TestPage() {
         </div>
       )}
 
-      {result && <ResultsCard result={result} />}
+      {result && <ResultsCard result={result} previewUrl={previewUrl} />}
     </main>
   );
 }
